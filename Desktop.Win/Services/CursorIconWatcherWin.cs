@@ -20,9 +20,10 @@ public class CursorIconWatcherWin : ICursorIconWatcher
 {
     private readonly SemaphoreSlim _cursorLock = new(1, 1);
     private readonly Timer _changeTimer;
-    private const int IBeamHandle = 65541;
     private User32.CursorInfo _cursorInfo;
     private int _previousCursorHandle;
+    private Point _previousCursorPosition = new(int.MinValue, int.MinValue);
+    private bool _previousCursorVisible;
 
     public CursorIconWatcherWin()
     {
@@ -33,6 +34,7 @@ public class CursorIconWatcherWin : ICursorIconWatcher
 
     // TODO: Emit through IMessenger.
     public event EventHandler<CursorInfo>? OnChange;
+    public event EventHandler<CursorPosition>? OnPositionChange;
 
     public CursorInfo GetCurrentCursor()
     {
@@ -43,11 +45,6 @@ public class CursorIconWatcherWin : ICursorIconWatcher
             User32.GetCursorInfo(out ci);
             if (ci.flags == User32.CURSOR_SHOWING)
             {
-                if (ci.hCursor.ToInt32() == IBeamHandle)
-                {
-                    return new CursorInfo(Array.Empty<byte>(), Point.Empty, "text");
-                }
-
                 var hotspot = Point.Empty;
 
                 if (User32.GetIconInfo(ci.hCursor, out var iconInfo))
@@ -71,6 +68,14 @@ public class CursorIconWatcherWin : ICursorIconWatcher
         }
     }
 
+    public CursorPosition GetCurrentPosition()
+    {
+        var isVisible = User32.GetCursorInfo(out var cursorInfo) &&
+            cursorInfo.flags == User32.CURSOR_SHOWING;
+        var hasPosition = User32.GetCursorPos(out var position);
+        return new CursorPosition(position, isVisible && hasPosition);
+    }
+
     private void ChangeTimer_Elapsed(object? sender, ElapsedEventArgs e)
     {
         if (!_cursorLock.Wait(0))
@@ -80,7 +85,7 @@ public class CursorIconWatcherWin : ICursorIconWatcher
 
         try
         {
-            if (OnChange is null)
+            if (OnChange is null && OnPositionChange is null)
             {
                 return;
             }
@@ -88,28 +93,29 @@ public class CursorIconWatcherWin : ICursorIconWatcher
             _cursorInfo = new User32.CursorInfo();
             _cursorInfo.cbSize = Marshal.SizeOf(_cursorInfo);
             User32.GetCursorInfo(out _cursorInfo);
+            if (User32.GetCursorPos(out var currentPosition) &&
+                (currentPosition != _previousCursorPosition ||
+                 (_cursorInfo.flags == User32.CURSOR_SHOWING) != _previousCursorVisible))
+            {
+                _previousCursorPosition = currentPosition;
+                _previousCursorVisible = _cursorInfo.flags == User32.CURSOR_SHOWING;
+                OnPositionChange?.Invoke(this, new CursorPosition(currentPosition, _previousCursorVisible));
+            }
             if (_cursorInfo.flags == User32.CURSOR_SHOWING)
             {
                 var currentCursor = _cursorInfo.hCursor.ToInt32();
                 if (currentCursor != _previousCursorHandle)
                 {
-                    if (currentCursor == IBeamHandle)
-                    {
-                        OnChange?.Invoke(this, new CursorInfo(Array.Empty<byte>(), Point.Empty, "text"));
-                    }
-                    else
-                    {
-                        using var icon = Icon.FromHandle(_cursorInfo.hCursor);
-                        using var ms = new MemoryStream();
-                        var hotspot = Point.Empty;
+                    using var icon = Icon.FromHandle(_cursorInfo.hCursor);
+                    using var ms = new MemoryStream();
+                    var hotspot = Point.Empty;
 
-                        if (User32.GetIconInfo(_cursorInfo.hCursor, out var iconInfo))
-                        {
-                            hotspot = new Point(iconInfo.xHotspot, iconInfo.yHotspot);
-                        }
-                        icon.ToBitmap().Save(ms, ImageFormat.Png);
-                        OnChange?.Invoke(this, new CursorInfo(ms.ToArray(), hotspot));
+                    if (User32.GetIconInfo(_cursorInfo.hCursor, out var iconInfo))
+                    {
+                        hotspot = new Point(iconInfo.xHotspot, iconInfo.yHotspot);
                     }
+                    icon.ToBitmap().Save(ms, ImageFormat.Png);
+                    OnChange?.Invoke(this, new CursorInfo(ms.ToArray(), hotspot));
                     _previousCursorHandle = currentCursor;
                 }
             }

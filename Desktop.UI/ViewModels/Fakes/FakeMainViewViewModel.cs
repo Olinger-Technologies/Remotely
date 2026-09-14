@@ -126,6 +126,11 @@ public class FakeMainViewViewModel : FakeBrandedViewModelBase, IMainViewViewMode
             return Task.CompletedTask;
         }
 
+        public Task SendCursorPosition(CursorPosition cursorPosition)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task SendDesktopStream(IAsyncEnumerable<byte[]> asyncEnumerable, Guid streamId)
         {
             return Task.CompletedTask;

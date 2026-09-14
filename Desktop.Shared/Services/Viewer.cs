@@ -31,6 +31,7 @@ public interface IViewer : IDisposable
     Task SendAudioSample(byte[] audioSample);
     Task SendClipboardText(string clipboardText);
     Task SendCursorChange(CursorInfo cursorInfo);
+    Task SendCursorPosition(CursorPosition cursorPosition);
     Task SendDesktopStream(IAsyncEnumerable<byte[]> asyncEnumerable, Guid streamId);
     Task SendFile(FileUpload fileUpload, Action<double> progressUpdateCallback, CancellationToken cancelToken);
     Task SendScreenData(string selectedDisplay, IEnumerable<string> displayNames, int screenWidth, int screenHeight);
@@ -160,6 +161,16 @@ public class Viewer : IViewer
 
         var dto = new CursorChangeDto(cursorInfo.ImageBytes, cursorInfo.HotSpot.X, cursorInfo.HotSpot.Y, cursorInfo.CssOverride);
         await TrySendToViewer(dto, DtoType.CursorChange, ViewerConnectionId);
+    }
+
+    public async Task SendCursorPosition(CursorPosition cursorPosition)
+    {
+        var bounds = Capturer.CurrentScreenBounds;
+        var isVisible = cursorPosition.IsVisible && bounds.Contains(cursorPosition.Location);
+        var percentX = bounds.Width > 0 ? (cursorPosition.Location.X - bounds.Left) / (double)bounds.Width : 0;
+        var percentY = bounds.Height > 0 ? (cursorPosition.Location.Y - bounds.Top) / (double)bounds.Height : 0;
+        var dto = new CursorPositionDto(percentX, percentY, isVisible);
+        await TrySendToViewer(dto, DtoType.CursorPosition, ViewerConnectionId);
     }
 
     public async Task SendDesktopStream(IAsyncEnumerable<byte[]> stream, Guid streamId)

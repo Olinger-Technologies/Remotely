@@ -11,6 +11,7 @@ export var RequesterNameInput = document.getElementById("nameInput");
 export var StatusMessage = document.getElementById("statusMessage");
 export var ScreenViewer = document.getElementById("screenViewer");
 export var ScreenViewerWrapper = document.getElementById("screenViewerWrapper");
+export var RemoteCursor = document.getElementById("remoteCursor");
 export var Screen2DContext = ScreenViewer ? ScreenViewer.getContext("2d") : null;
 export var PopupMenus = document.querySelectorAll(".popup-menu");
 export var ConnectBox = document.getElementById("connectBox");
@@ -111,6 +112,7 @@ export function ToggleConnectUI(shown) {
     if (shown) {
         ConnectButton.innerText = "Connect";
         Screen2DContext.clearRect(0, 0, ScreenViewer.width, ScreenViewer.height);
+        RemoteCursor.style.display = "none";
         ScreenViewerWrapper.setAttribute("hidden", "hidden");
         if (ViewerApp.Mode == RemoteControlMode.Attended) {
             ConnectBox.style.removeProperty("display");
@@ -133,17 +135,53 @@ export function ToggleConnectUI(shown) {
     ConnectButton.disabled = !ViewerApp.RequesterName || !ViewerApp.SessionId;
 }
 export function UpdateCursor(imageBytes, hotSpotX, hotSpotY, cssOverride) {
-    if (cssOverride) {
-        ScreenViewer.style.cursor = cssOverride;
-    }
-    else if (imageBytes.byteLength == 0) {
-        ScreenViewer.style.cursor = "default";
-    }
-    else {
+    if (imageBytes.byteLength > 0) {
         var base64 = ConvertUInt8ArrayToBase64(imageBytes);
-        ScreenViewer.style.cursor = `url('data:image/png;base64,${base64}') ${hotSpotX} ${hotSpotY}, default`;
+        RemoteCursor.src = `data:image/png;base64,${base64}`;
+    }
+    RemoteCursor.dataset.hotSpotX = hotSpotX.toString();
+    RemoteCursor.dataset.hotSpotY = hotSpotY.toString();
+    // Keep the legacy CSS cursor until a host confirms that it supports
+    // position updates. This preserves compatibility with older agents.
+    if (!cursorPositionSupported) {
+        if (cssOverride) {
+            ScreenViewer.style.cursor = cssOverride;
+        }
+        else if (imageBytes.byteLength == 0) {
+            ScreenViewer.style.cursor = "default";
+        }
+        else {
+            ScreenViewer.style.cursor = `url('${RemoteCursor.src}') ${hotSpotX} ${hotSpotY}, default`;
+        }
     }
 }
+var remoteCursorPercentX = 0;
+var remoteCursorPercentY = 0;
+var remoteCursorVisible = false;
+var cursorPositionSupported = false;
+export function UpdateCursorPosition(percentX, percentY, isVisible) {
+    var _a, _b;
+    cursorPositionSupported = true;
+    ScreenViewer.style.cursor = "none";
+    remoteCursorPercentX = percentX;
+    remoteCursorPercentY = percentY;
+    remoteCursorVisible = isVisible;
+    if (!isVisible || !RemoteCursor.src) {
+        RemoteCursor.style.display = "none";
+        return;
+    }
+    const bounds = ScreenViewer.getBoundingClientRect();
+    const hotSpotX = Number((_a = RemoteCursor.dataset.hotSpotX) !== null && _a !== void 0 ? _a : 0) * bounds.width / ScreenViewer.width;
+    const hotSpotY = Number((_b = RemoteCursor.dataset.hotSpotY) !== null && _b !== void 0 ? _b : 0) * bounds.height / ScreenViewer.height;
+    RemoteCursor.style.left = `${bounds.left + bounds.width * percentX - hotSpotX}px`;
+    RemoteCursor.style.top = `${bounds.top + bounds.height * percentY - hotSpotY}px`;
+    RemoteCursor.style.width = `${RemoteCursor.naturalWidth * bounds.width / ScreenViewer.width}px`;
+    RemoteCursor.style.height = `${RemoteCursor.naturalHeight * bounds.height / ScreenViewer.height}px`;
+    RemoteCursor.style.display = "block";
+}
+RemoteCursor.addEventListener("load", () => UpdateCursorPosition(remoteCursorPercentX, remoteCursorPercentY, remoteCursorVisible));
+window.addEventListener("resize", () => UpdateCursorPosition(remoteCursorPercentX, remoteCursorPercentY, remoteCursorVisible));
+ScreenViewerWrapper.addEventListener("scroll", () => UpdateCursorPosition(remoteCursorPercentX, remoteCursorPercentY, remoteCursorVisible));
 export function UpdateDisplays(selectedDisplay, displayNames) {
     ScreenSelectMenu.innerHTML = "";
     for (let i = 0; i < displayNames.length; i++) {

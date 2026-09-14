@@ -18,6 +18,9 @@ export class DtoMessageHandler {
             case DtoType.CursorChange:
                 this.HandleCursorChange(wrapper);
                 break;
+            case DtoType.CursorPosition:
+                this.HandleCursorPosition(wrapper);
+                break;
             case DtoType.ScreenData:
                 this.HandleScreenData(wrapper);
                 break;
@@ -55,6 +58,13 @@ export class DtoMessageHandler {
             return;
         }
         UI.UpdateCursor(cursorChange.ImageBytes, cursorChange.HotSpotX, cursorChange.HotSpotY, cursorChange.CssOverride);
+    }
+    HandleCursorPosition(wrapper) {
+        let cursorPosition = TryComplete(wrapper);
+        if (!cursorPosition) {
+            return;
+        }
+        UI.UpdateCursorPosition(cursorPosition.PercentX, cursorPosition.PercentY, cursorPosition.IsVisible);
     }
     HandleFile(wrapper) {
         let file = TryComplete(wrapper);

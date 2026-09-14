@@ -7,5 +7,9 @@ public interface ICursorIconWatcher
     [Obsolete("This should be replaced with a message published by IMessenger.")]
     event EventHandler<CursorInfo> OnChange;
 
+    event EventHandler<CursorPosition> OnPositionChange;
+
     CursorInfo GetCurrentCursor();
+
+    CursorPosition GetCurrentPosition();
 }

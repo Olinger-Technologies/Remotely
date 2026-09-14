@@ -45,6 +45,12 @@ export interface CursorChangeDto {
     CssOverride: string;
 }
 
+export interface CursorPositionDto {
+    PercentX: number;
+    PercentY: number;
+    IsVisible: boolean;
+}
+
 export class FileDto {
     constructor(buffer: Uint8Array,
         fileName: string,

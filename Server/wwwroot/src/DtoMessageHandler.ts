@@ -7,6 +7,7 @@ import {
     AudioSampleDto,
     ClipboardTextDto,
     CursorChangeDto,
+    CursorPositionDto,
     ScreenDataDto,
     ScreenSizeDto,
     FileDto,
@@ -33,6 +34,9 @@ export class DtoMessageHandler {
                 break;
             case DtoType.CursorChange:
                 this.HandleCursorChange(wrapper);
+                break;
+            case DtoType.CursorPosition:
+                this.HandleCursorPosition(wrapper);
                 break;
             case DtoType.ScreenData:
                 this.HandleScreenData(wrapper);
@@ -79,6 +83,13 @@ export class DtoMessageHandler {
         }
 
         UI.UpdateCursor(cursorChange.ImageBytes, cursorChange.HotSpotX, cursorChange.HotSpotY, cursorChange.CssOverride);
+    }
+    HandleCursorPosition(wrapper: DtoWrapper) {
+        let cursorPosition = TryComplete<CursorPositionDto>(wrapper);
+        if (!cursorPosition) {
+            return;
+        }
+        UI.UpdateCursorPosition(cursorPosition.PercentX, cursorPosition.PercentY, cursorPosition.IsVisible);
     }
     HandleFile(wrapper: DtoWrapper) {
         let file = TryComplete<FileDto>(wrapper);

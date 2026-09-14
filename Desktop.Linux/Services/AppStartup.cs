@@ -56,6 +56,7 @@ internal class AppStartup : IAppStartup
             _clipboardService.BeginWatching();
             _inputService.Init();
             _cursorIconWatcher.OnChange += CursorIconWatcher_OnChange;
+            _cursorIconWatcher.OnPositionChange += CursorIconWatcher_OnPositionChange;
         }
 
         switch (_appState.Mode)
@@ -145,6 +146,19 @@ internal class AppStartup : IAppStartup
             {
                 await viewer.SendCursorChange(cursor);
             }
+        }
+    }
+
+    private async void CursorIconWatcher_OnPositionChange(object? sender, CursorPosition cursorPosition)
+    {
+        if (!_desktopHub.IsConnected)
+        {
+            return;
+        }
+
+        foreach (var viewer in _appState.Viewers.Values)
+        {
+            await viewer.SendCursorPosition(cursorPosition);
         }
     }
 }
