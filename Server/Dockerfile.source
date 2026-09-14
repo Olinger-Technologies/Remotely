@@ -1,0 +1,54 @@
+# Builds the Remotely server from this repository, instead of pulling the
+# prebuilt image from Docker Hub.
+#
+# The agent packages and desktop clients under wwwroot/Content and
+# wwwroot/Downloads are build artifacts that aren't kept in git (see
+# .gitignore).  Producing them requires Utilities/Publish.ps1, which needs
+# Windows and Visual Studio.  Server-side changes don't affect those
+# binaries, so they're inherited from the published image instead.
+#
+# Build from the repository root:
+#   docker build -f Server/Dockerfile.source -t remotely-fork:latest .
+
+ARG UPSTREAM_IMAGE=immybot/remotely:latest
+
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+# Set this to the release you're currently running, otherwise every agent
+# will report as outdated in the web UI.
+ARG VERSION=1.0.0.0
+
+WORKDIR /src
+COPY . .
+
+RUN dotnet publish ./Server/Server.csproj \
+      --configuration Release \
+      /p:Version=${VERSION} \
+      /p:FileVersion=${VERSION} \
+      --output /app/publish
+
+
+FROM ${UPSTREAM_IMAGE} AS upstream
+
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+
+EXPOSE 5000
+
+RUN apt -y update && \
+    apt -y install curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Take the published wwwroot first so the generated agent installers and
+# desktop clients are present, then lay this repo's build over the top.
+# Anything this build produces wins; the binaries it can't produce survive.
+COPY --from=upstream /app/wwwroot/ /app/wwwroot/
+COPY --from=build /app/publish/ /app/
+
+WORKDIR /app
+
+ENTRYPOINT ["dotnet", "Remotely_Server.dll"]
+
+HEALTHCHECK \
+  CMD curl -f http://localhost:${ASPNETCORE_HTTP_PORTS}/api/healthcheck || exit 1
